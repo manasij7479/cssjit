@@ -39,10 +39,55 @@ public:
 
     auto EntryBlock = BasicBlock::Create(TheContext, "entry", F);
     Builder.SetInsertPoint(EntryBlock);
-    auto FortyTwo = llvm::ConstantInt::get(TheContext,
-                                           llvm::APInt(64, 42, false));
-    std::vector<Value*> fooargs = {FortyTwo};
 
+    auto Sum = Builder.CreateAlloca(llvm::Type::getIntNTy(TheContext, 64),
+             llvm::ConstantInt::get(TheContext, llvm::APInt(64, 0, false)));
+    Builder.CreateStore(llvm::ConstantInt::get(TheContext, llvm::APInt(64, 0, false)), Sum);
+    // sum = 0
+
+    // loop head
+    auto HeadBlock = BasicBlock::Create(TheContext, "head", F);
+    auto BodyBlock = BasicBlock::Create(TheContext, "body", F);
+    auto ExitBlock = BasicBlock::Create(TheContext, "exit", F);
+    Builder.CreateBr(HeadBlock);
+    Builder.SetInsertPoint(HeadBlock);
+
+    auto Input = Builder.CreateCall(TheModule->getFunction("input"));
+    // i = input()
+    auto Zero = llvm::ConstantInt::get(TheContext,
+                                       llvm::APInt(64, 0, false));
+    auto Cond = Builder.CreateICmpEQ(Input, Zero, "cmp");
+    // i == 0 ?
+
+    Builder.CreateCondBr(Cond, ExitBlock, BodyBlock);
+    // if i == 0, goto exit, else goto loop body
+
+    // loop body, basically a switch statement
+    Builder.SetInsertPoint(BodyBlock);
+    auto Switch = Builder.CreateSwitch(Input, HeadBlock, data.size());
+
+    std::map<int, BasicBlock *> BlockMap;
+    for (auto P : data) {
+      auto Key = llvm::ConstantInt::get(TheContext,
+                                         llvm::APInt(64 , P.first, false));
+      auto Value = llvm::ConstantInt::get(TheContext,
+                                       llvm::APInt(64, P.second, false));
+
+      auto BB = BasicBlock::Create(TheContext, "b_" + std::to_string(P.first), F);
+      BlockMap[P.first] = BB;
+      Switch->addCase(Key, BB);
+      Builder.SetInsertPoint(BB);
+
+      auto x = Builder.CreateLoad(Sum);
+      auto NewVal = Builder.CreateAdd(x, Value);
+      Builder.CreateStore(NewVal, Sum);
+      Builder.CreateBr(HeadBlock);
+    }
+
+    // exit
+    Builder.SetInsertPoint(ExitBlock);
+    auto Result = Builder.CreateLoad(Sum);
+    std::vector<Value*> fooargs = {Result};
     Builder.CreateCall(TheModule->getFunction("printint"), fooargs);
     Builder.CreateRetVoid();
 

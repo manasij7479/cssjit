@@ -13,14 +13,14 @@
  *
  * Prototype output
  * Executable which reads a file with a bunch of keys
- * and sums up all the associated values
+ * (until 0 is read) and sums up all the associated values
  */
 
 int main(int argc, char** argv) {
   std::map<int, int> data;
   std::string line;
   while(std::getline(std::cin, line)) {
-    std::istringstream in;
+    std::istringstream in(line);
     int key, value;
     in >> key;
     int sumOfValues = 0;
@@ -28,6 +28,10 @@ int main(int argc, char** argv) {
       sumOfValues += value;
     }
     data[key] = sumOfValues;
+  }
+
+  for (auto P : data) {
+    std::cout << P.first << P.second << "\n";
   }
 
   cssjit::Codegen generator(data);
