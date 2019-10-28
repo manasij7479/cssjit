@@ -30,10 +30,6 @@ int main(int argc, char** argv) {
     data[key] = sumOfValues;
   }
 
-  for (auto P : data) {
-    std::cout << P.first << P.second << "\n";
-  }
-
   cssjit::Codegen generator(data);
   auto TU = generator(argv[1]);
   if (!TU) {

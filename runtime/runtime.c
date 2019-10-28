@@ -4,9 +4,10 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-extern int cssjit_main(void);
+extern void cssjit_main(void);
 int main() {
-  return cssjit_main();
+  cssjit_main();
+  return 0;
 }
 
 int64_t input() {
