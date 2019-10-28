@@ -31,6 +31,9 @@ int main(int argc, char** argv) {
   }
 
   cssjit::Codegen generator(data);
-  generator(argv[1]);
+  auto TU = generator(argv[1]);
+  if (!TU) {
+    std::cerr << "Codegen failed.";
+  }
   return 0;
 }
