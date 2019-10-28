@@ -1,4 +1,36 @@
 #include <iostream>
-int main() {
-  std::cout << "Hello world.\n";
+#include <map>
+#include <sstream>
+#include "Codegen/Codegen.h"
+/**
+ * Prototype input format
+ * Each line has a key and one or more values
+ * all positive integers
+ *
+ * Example:
+ * key1 value
+ * key2 value1 value2
+ *
+ * Prototype output
+ * Executable which reads a file with a bunch of keys
+ * and sums up all the associated values
+ */
+
+int main(int argc, char** argv) {
+  std::map<int, int> data;
+  std::string line;
+  while(std::getline(std::cin, line)) {
+    std::istringstream in;
+    int key, value;
+    in >> key;
+    int sumOfValues = 0;
+    while (in >> value) {
+      sumOfValues += value;
+    }
+    data[key] = sumOfValues;
+  }
+
+  cssjit::Codegen generator(data);
+  generator(argv[1]);
+  return 0;
 }
