@@ -16,80 +16,81 @@
 
 using namespace llvm;
 namespace cssjit {
+  using CSSMap = std::map<std::string, std::vector<std::pair<std::string, std::string>>>;
+
+  int64_t hash(char *key) {
+    std::string str(key);
+    return std::hash<std::string>()(str);
+  }
+
 class Codegen {
 public:
-  Codegen(std::map<int, int> data_)
-  : data(data_), Builder(TheContext) {
+  Codegen(CSSMap Rules_)
+  : Rules(Rules_), Builder(TheContext) {
     TheModule = llvm::make_unique<Module>("main", TheContext);
-    std::vector<llvm::Type*> args = {};
-    auto FT = FunctionType::get(llvm::Type::getInt64Ty(TheContext), args, false);
-    Function::Create(FT, Function::ExternalLinkage, "input", TheModule.get());
 
-    args = {llvm::Type::getInt64Ty(TheContext)};
-    FT = FunctionType::get(llvm::Type::getVoidTy(TheContext), args, false);
-    Function::Create(FT, Function::ExternalLinkage, "printint", TheModule.get());
-  }
-  llvm::Module *operator()(std::string filename) {
     std::vector<llvm::Type*> args = {};
+//     auto FT = FunctionType::get(llvm::Type::getInt64Ty(TheContext), args, false);
+//     Function::Create(FT, Function::ExternalLinkage, "input", TheModule.get());
+
+//     args = {llvm::Type::getInt64Ty(TheContext)};
+//     FT = FunctionType::get(llvm::Type::getVoidTy(TheContext), args, false);
+//     Function::Create(FT, Function::ExternalLinkage, "printint", TheModule.get());
+
+    auto CharStar = llvm::Type::getInt8PtrTy(TheContext);
+    args = {CharStar, CharStar};
+    auto FT = FunctionType::get(llvm::Type::getVoidTy(TheContext), args, false);
+    Function::Create(FT, Function::ExternalLinkage, "printrule", TheModule.get());
+
+    args = {CharStar};
+    FT = FunctionType::get(llvm::Type::getInt64Ty(TheContext), args, false);
+    Function::Create(FT, Function::ExternalLinkage, "hash", TheModule.get());
+
+    FT = FunctionType::get(llvm::Type::getInt32Ty(TheContext), args, false);
+    Function::Create(FT, Function::ExternalLinkage, "eq", TheModule.get());
+  }
+
+  llvm::Module *operator()(std::string filename) {
+    auto CharStar = llvm::Type::getInt8PtrTy(TheContext);
+    std::vector<llvm::Type*> args = {CharStar};
     auto FT = FunctionType::get(llvm::Type::getVoidTy(TheContext), args, false);
 
-    Function *F =
-    Function::Create(FT, Function::ExternalLinkage,
-                     "cssjit_main", TheModule.get());
+    Function *F = Function::Create(FT, Function::ExternalLinkage, "match", TheModule.get());
+
+    std::map<std::string, BasicBlock *> RuleBlocks;
 
     auto EntryBlock = BasicBlock::Create(TheContext, "entry", F);
-    Builder.SetInsertPoint(EntryBlock);
 
-    auto Sum = Builder.CreateAlloca(llvm::Type::getIntNTy(TheContext, 64),
-             llvm::ConstantInt::get(TheContext, llvm::APInt(64, 0, false)));
-    Builder.CreateStore(llvm::ConstantInt::get(TheContext, llvm::APInt(64, 0, false)), Sum);
-    // sum = 0
-
-    // loop head
-    auto HeadBlock = BasicBlock::Create(TheContext, "head", F);
-    auto BodyBlock = BasicBlock::Create(TheContext, "body", F);
     auto ExitBlock = BasicBlock::Create(TheContext, "exit", F);
-    Builder.CreateBr(HeadBlock);
-    Builder.SetInsertPoint(HeadBlock);
+    Builder.SetInsertPoint(ExitBlock);
+    Builder.CreateRetVoid();
 
-    auto Input = Builder.CreateCall(TheModule->getFunction("input"));
-    // i = input()
-    auto Zero = llvm::ConstantInt::get(TheContext,
-                                       llvm::APInt(64, 0, false));
-    auto Cond = Builder.CreateICmpEQ(Input, Zero, "cmp");
-    // i == 0 ?
 
-    Builder.CreateCondBr(Cond, ExitBlock, BodyBlock);
-    // if i == 0, goto exit, else goto loop body
-
-    // loop body, basically a switch statement
-    Builder.SetInsertPoint(BodyBlock);
-    auto Switch = Builder.CreateSwitch(Input, HeadBlock, data.size());
-
-    std::map<int, BasicBlock *> BlockMap;
-    for (auto P : data) {
-      auto Key = llvm::ConstantInt::get(TheContext,
-                                         llvm::APInt(64 , P.first, false));
-      auto Value = llvm::ConstantInt::get(TheContext,
-                                       llvm::APInt(64, P.second, false));
-
-      auto BB = BasicBlock::Create(TheContext, "b_" + std::to_string(P.first), F);
-      BlockMap[P.first] = BB;
-      Switch->addCase(Key, BB);
+    for (auto &&Rule : Rules) {
+      auto BB = BasicBlock::Create(TheContext, Rule.first, F);
+      RuleBlocks[Rule.first] = BB;
       Builder.SetInsertPoint(BB);
 
-      auto x = Builder.CreateLoad(Sum);
-      auto NewVal = Builder.CreateAdd(x, Value);
-      Builder.CreateStore(NewVal, Sum);
-      Builder.CreateBr(HeadBlock);
+      for (auto &&KV : Rule.second) {
+        auto K = getString(KV.first);
+        auto V = getString(KV.second);
+        std::vector<llvm::Value *> args = {K, V};
+        Builder.CreateCall(TheModule->getFunction("printrule"), args);
+      }
+      Builder.CreateBr(ExitBlock);
     }
 
-    // exit
-    Builder.SetInsertPoint(ExitBlock);
-    auto Result = Builder.CreateLoad(Sum);
-    std::vector<Value*> fooargs = {Result};
-    Builder.CreateCall(TheModule->getFunction("printint"), fooargs);
-    Builder.CreateRetVoid();
+    Builder.SetInsertPoint(EntryBlock);
+
+    llvm::Argument *A = F->arg_begin();
+    std::vector<llvm::Value *> hash_args = {A};
+    auto Hash = Builder.CreateCall(TheModule->getFunction("hash"), hash_args);
+
+    auto Switch = Builder.CreateSwitch(Hash, ExitBlock, RuleBlocks.size());
+    for (auto Pair : RuleBlocks) {
+      auto CHash = Builder.getInt64(hash(const_cast<char *>(Pair.first.c_str())));
+      Switch->addCase(CHash, Pair.second);
+    }
 
     std::error_code EC;
     llvm::raw_fd_ostream out(filename, EC);
@@ -97,12 +98,22 @@ public:
 
     return TheModule.get();
   }
+
+  llvm::Value *getString(std::string Str) {
+    if (StringTab.find(Str) != StringTab.end()) {
+      return StringTab[Str];
+    }
+    StringTab[Str] = Builder.CreateGlobalStringPtr(Str);
+    return StringTab[Str];
+  }
 private:
-  std::map<int, int> data;
+  CSSMap Rules;
+
   LLVMContext TheContext;
   IRBuilder<> Builder;
   std::unique_ptr<Module> TheModule;
   std::map<std::string, Value *> NamedValues;
+  std::unordered_map<std::string, llvm::Value> StringTab;
 };
 }
 
