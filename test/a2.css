@@ -1,0 +1,12 @@
+a {tp:2;}
+b {tp:1;}
+c {tp:2; bp: 4;}
+f {
+  tm: 2;
+  bm: 4;
+  foo: 3;
+  spicy: 42;
+  lp: 4;
+  rp: 5;
+}
+g {tm: 6; bm: 3;}

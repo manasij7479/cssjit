@@ -10,10 +10,6 @@ source_filename = "main"
 @6 = private unnamed_addr constant [9 x i8] c"whatever\00"
 @7 = private unnamed_addr constant [3 x i8] c"42\00"
 
-declare i64 @input()
-
-declare void @printint(i64)
-
 declare void @printrule(i8*, i8*)
 
 declare i64 @hash(i8*)

@@ -2,6 +2,7 @@
 #define CSSJIT_CODEGEN_H
 
 #include <map>
+#include <unordered_map>
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -13,17 +14,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "Common/Common.h"
 
 using namespace llvm;
 namespace cssjit {
-  using CSSMap = std::map<std::string, std::vector<std::pair<std::string, std::string>>>;
 
-  int64_t hash(char *key) {
-    std::string str(key);
-    return std::hash<std::string>()(str);
-  }
-
-class Codegen {
+  class Codegen {
 public:
   Codegen(CSSMap Rules_)
   : Rules(Rules_), Builder(TheContext) {
@@ -51,46 +47,10 @@ public:
   }
 
   llvm::Module *operator()(std::string filename) {
-    auto CharStar = llvm::Type::getInt8PtrTy(TheContext);
-    std::vector<llvm::Type*> args = {CharStar};
-    auto FT = FunctionType::get(llvm::Type::getVoidTy(TheContext), args, false);
-
-    Function *F = Function::Create(FT, Function::ExternalLinkage, "match", TheModule.get());
-
-    std::map<std::string, BasicBlock *> RuleBlocks;
-
-    auto EntryBlock = BasicBlock::Create(TheContext, "entry", F);
-
-    auto ExitBlock = BasicBlock::Create(TheContext, "exit", F);
-    Builder.SetInsertPoint(ExitBlock);
-    Builder.CreateRetVoid();
-
-
-    for (auto &&Rule : Rules) {
-      auto BB = BasicBlock::Create(TheContext, Rule.first, F);
-      RuleBlocks[Rule.first] = BB;
-      Builder.SetInsertPoint(BB);
-
-      for (auto &&KV : Rule.second) {
-        auto K = getString(KV.first);
-        auto V = getString(KV.second);
-        std::vector<llvm::Value *> args = {K, V};
-        Builder.CreateCall(TheModule->getFunction("printrule"), args);
-      }
-      Builder.CreateBr(ExitBlock);
-    }
-
-    Builder.SetInsertPoint(EntryBlock);
-
-    llvm::Argument *A = F->arg_begin();
-    std::vector<llvm::Value *> hash_args = {A};
-    auto Hash = Builder.CreateCall(TheModule->getFunction("hash"), hash_args);
-
-    auto Switch = Builder.CreateSwitch(Hash, ExitBlock, RuleBlocks.size());
-    for (auto Pair : RuleBlocks) {
-      auto CHash = Builder.getInt64(hash(const_cast<char *>(Pair.first.c_str())));
-      Switch->addCase(CHash, Pair.second);
-    }
+    genTop();
+    genBottom();
+    genLeft();
+    genDelta();
 
     std::error_code EC;
     llvm::raw_fd_ostream out(filename, EC);
@@ -108,12 +68,239 @@ public:
   }
 private:
   CSSMap Rules;
+  void genTop() {
+    auto CharStar = llvm::Type::getInt8PtrTy(TheContext);
+    std::vector<llvm::Type*> args = {CharStar};
+    auto FT = FunctionType::get(llvm::Type::getInt32Ty(TheContext), args, false);
 
+    Function *F = Function::Create(FT, Function::ExternalLinkage, "getTop_c", TheModule.get());
+
+    auto EntryBlock = BasicBlock::Create(TheContext, "entry", F);
+    Builder.SetInsertPoint(EntryBlock);
+
+    auto Result = Builder.CreateAlloca(llvm::Type::getInt32Ty(TheContext));
+    Builder.CreateStore(Builder.getInt32(3), Result);
+
+    auto ExitBlock = BasicBlock::Create(TheContext, "exit", F);
+    Builder.SetInsertPoint(ExitBlock);
+    auto V = Builder.CreateLoad(Result);
+    Builder.CreateRet(V);
+
+
+    std::map<std::string, BasicBlock *> RuleBlocks;
+    for (auto &&Rule : Rules) {
+
+      if (RuleBlocks.find(Rule.first) == RuleBlocks.end()) {
+        auto BB = BasicBlock::Create(TheContext, Rule.first, F);
+        RuleBlocks[Rule.first] = BB;
+      }
+
+      auto BB = RuleBlocks[Rule.first];
+      Builder.SetInsertPoint(BB);
+
+      for (auto &&KV : Rule.second) {
+        int C = std::stoi(KV.second);
+        if (KV.first == "tm" || KV.first == "tb" || KV.first == "tp") {
+          auto V = Builder.CreateLoad(Result);
+          auto VX = Builder.CreateAdd(V, Builder.getInt32(C - 1));
+          Builder.CreateStore(VX, Result);
+        }
+      }
+      Builder.CreateBr(ExitBlock);
+    }
+
+    Builder.SetInsertPoint(EntryBlock);
+
+    llvm::Argument *A = F->arg_begin();
+    std::vector<llvm::Value *> hash_args = {A};
+    auto Hash = Builder.CreateCall(TheModule->getFunction("hash"), hash_args);
+
+    auto Switch = Builder.CreateSwitch(Hash, ExitBlock, RuleBlocks.size());
+    for (auto Pair : RuleBlocks) {
+      auto CHash = Builder.getInt64(hash(const_cast<char *>(Pair.first.c_str())));
+      Switch->addCase(CHash, Pair.second);
+    }
+  }
+
+  void genBottom() {
+    auto CharStar = llvm::Type::getInt8PtrTy(TheContext);
+    std::vector<llvm::Type*> args = {CharStar};
+    auto FT = FunctionType::get(llvm::Type::getInt32Ty(TheContext), args, false);
+
+    Function *F = Function::Create(FT, Function::ExternalLinkage, "getBottom_c", TheModule.get());
+
+    auto EntryBlock = BasicBlock::Create(TheContext, "entry", F);
+    Builder.SetInsertPoint(EntryBlock);
+
+    auto Result = Builder.CreateAlloca(llvm::Type::getInt32Ty(TheContext));
+    Builder.CreateStore(Builder.getInt32(3), Result);
+
+    auto ExitBlock = BasicBlock::Create(TheContext, "exit", F);
+    Builder.SetInsertPoint(ExitBlock);
+    auto V = Builder.CreateLoad(Result);
+    Builder.CreateRet(V);
+
+
+    std::map<std::string, BasicBlock *> RuleBlocks;
+    for (auto &&Rule : Rules) {
+
+      if (RuleBlocks.find(Rule.first) == RuleBlocks.end()) {
+        auto BB = BasicBlock::Create(TheContext, Rule.first, F);
+        RuleBlocks[Rule.first] = BB;
+      }
+
+      auto BB = RuleBlocks[Rule.first];
+      Builder.SetInsertPoint(BB);
+
+      for (auto &&KV : Rule.second) {
+        int C = std::stoi(KV.second);
+        if (KV.first == "bm" || KV.first == "bb" || KV.first == "bp") {
+          auto V = Builder.CreateLoad(Result);
+          auto VX = Builder.CreateAdd(V, Builder.getInt32(C - 1));
+          Builder.CreateStore(VX, Result);
+        }
+      }
+      Builder.CreateBr(ExitBlock);
+    }
+
+    Builder.SetInsertPoint(EntryBlock);
+
+    llvm::Argument *A = F->arg_begin();
+    std::vector<llvm::Value *> hash_args = {A};
+    auto Hash = Builder.CreateCall(TheModule->getFunction("hash"), hash_args);
+
+    auto Switch = Builder.CreateSwitch(Hash, ExitBlock, RuleBlocks.size());
+    for (auto Pair : RuleBlocks) {
+      auto CHash = Builder.getInt64(hash(const_cast<char *>(Pair.first.c_str())));
+      Switch->addCase(CHash, Pair.second);
+    }
+  }
+
+    void genLeft() {
+    auto CharStar = llvm::Type::getInt8PtrTy(TheContext);
+    std::vector<llvm::Type*> args = {CharStar};
+    auto FT = FunctionType::get(llvm::Type::getInt32Ty(TheContext), args, false);
+
+    Function *F = Function::Create(FT, Function::ExternalLinkage, "getLeft_c", TheModule.get());
+
+    auto EntryBlock = BasicBlock::Create(TheContext, "entry", F);
+    Builder.SetInsertPoint(EntryBlock);
+
+    auto Result = Builder.CreateAlloca(llvm::Type::getInt32Ty(TheContext));
+    Builder.CreateStore(Builder.getInt32(3), Result);
+
+    auto ExitBlock = BasicBlock::Create(TheContext, "exit", F);
+    Builder.SetInsertPoint(ExitBlock);
+    auto V = Builder.CreateLoad(Result);
+    Builder.CreateRet(V);
+
+
+    std::map<std::string, BasicBlock *> RuleBlocks;
+    for (auto &&Rule : Rules) {
+
+      if (RuleBlocks.find(Rule.first) == RuleBlocks.end()) {
+        auto BB = BasicBlock::Create(TheContext, Rule.first, F);
+        RuleBlocks[Rule.first] = BB;
+      }
+
+      auto BB = RuleBlocks[Rule.first];
+      Builder.SetInsertPoint(BB);
+
+      for (auto &&KV : Rule.second) {
+        int C = std::stoi(KV.second);
+        if (KV.first == "lm" || KV.first == "lb" || KV.first == "lp") {
+          auto V = Builder.CreateLoad(Result);
+          auto VX = Builder.CreateAdd(V, Builder.getInt32(C - 1));
+          Builder.CreateStore(VX, Result);
+        }
+      }
+      Builder.CreateBr(ExitBlock);
+    }
+
+    Builder.SetInsertPoint(EntryBlock);
+
+    llvm::Argument *A = F->arg_begin();
+    std::vector<llvm::Value *> hash_args = {A};
+    auto Hash = Builder.CreateCall(TheModule->getFunction("hash"), hash_args);
+
+    auto Switch = Builder.CreateSwitch(Hash, ExitBlock, RuleBlocks.size());
+    for (auto Pair : RuleBlocks) {
+      auto CHash = Builder.getInt64(hash(const_cast<char *>(Pair.first.c_str())));
+      Switch->addCase(CHash, Pair.second);
+    }
+  }
+
+  void genDelta() {
+    auto CharStar = llvm::Type::getInt8PtrTy(TheContext);
+    std::vector<llvm::Type*> args = {CharStar};
+    auto FT = FunctionType::get(llvm::Type::getInt32Ty(TheContext), args, false);
+
+    Function *F = Function::Create(FT, Function::ExternalLinkage, "getDelta_c", TheModule.get());
+
+    auto EntryBlock = BasicBlock::Create(TheContext, "entry", F);
+    Builder.SetInsertPoint(EntryBlock);
+
+    auto A = Builder.CreateAlloca(llvm::Type::getInt32Ty(TheContext));
+    Builder.CreateStore(Builder.getInt32(1), A);
+
+    auto B = Builder.CreateAlloca(llvm::Type::getInt32Ty(TheContext));
+    Builder.CreateStore(Builder.getInt32(1), B);
+
+    auto ExitBlock = BasicBlock::Create(TheContext, "exit", F);
+    Builder.SetInsertPoint(ExitBlock);
+
+    auto AV = Builder.CreateLoad(A);
+    auto BV = Builder.CreateLoad(B);
+    auto Cmp = Builder.CreateICmpULT(AV, BV);
+    Builder.CreateRet(Builder.CreateSelect(Cmp, AV, BV));
+
+    std::map<std::string, BasicBlock *> RuleBlocks;
+    for (auto &&Rule1 : Rules) {
+      for (auto &&Rule2 : Rules) {
+        if (Rule1.first == Rule2.first) {
+          continue;
+        }
+        auto str = Rule1.first+"."+Rule2.first;
+        auto BB = BasicBlock::Create(TheContext, str, F);
+        RuleBlocks[str] = BB;
+
+        Builder.SetInsertPoint(BB);
+
+        for (auto &&KV : Rule1.second) {
+          int C = std::stoi(KV.second);
+          if (KV.first == "bm") {
+            Builder.CreateStore(Builder.getInt32(C), A);
+          }
+        }
+
+        for (auto &&KV : Rule2.second) {
+          int C = std::stoi(KV.second);
+          if (KV.first == "tm") {
+            Builder.CreateStore(Builder.getInt32(C), B);
+          }
+        }
+        Builder.CreateBr(ExitBlock);
+      }
+    }
+
+    Builder.SetInsertPoint(EntryBlock);
+
+    llvm::Argument *Arg = F->arg_begin();
+
+    std::vector<llvm::Value *> hash_args = {Arg};
+    auto Hash = Builder.CreateCall(TheModule->getFunction("hash"), hash_args);
+
+    auto Switch = Builder.CreateSwitch(Hash, ExitBlock, RuleBlocks.size());
+    for (auto Pair : RuleBlocks) {
+      auto CHash = Builder.getInt64(hash(const_cast<char *>(Pair.first.c_str())));
+      Switch->addCase(CHash, Pair.second);
+    }
+  }
   LLVMContext TheContext;
   IRBuilder<> Builder;
   std::unique_ptr<Module> TheModule;
   std::map<std::string, Value *> NamedValues;
-  std::unordered_map<std::string, llvm::Value> StringTab;
+  std::unordered_map<std::string, llvm::Value *> StringTab;
 };
 }
 

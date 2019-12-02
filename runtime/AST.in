@@ -1,0 +1,55 @@
+AST Sub("b", {
+  AST("text0"),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"text2"}}),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"text2"}}),
+});
+AST Bar("b", {
+  AST("text0"),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"text2"}}),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"text2"}}),
+  Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub, Sub,
+});
+AST Foo1("b", {
+  AST("text0"),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"g", {Bar, Bar, Bar}}}),
+  AST("f", {AST("d", {Bar, Bar, Bar, Bar})}),
+  AST("g", {AST{"text2"}}),
+});
+
+AST Foo2("b", {
+  AST("text0"),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"g", {Bar, Foo1, Bar}}}),
+  AST("f", {AST("d", {Bar, Bar, Foo1, Bar})}),
+  AST("g", {AST{"text2"}}),
+});
+
+AST Foo3("b", {
+  AST("text0"),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"g", {Bar, Foo2, Bar}}}),
+  AST("f", {AST("d", {Bar, Sub, Foo1, Bar})}),
+  AST("g", {AST{"text2"}}),
+});
+
+AST Foo4("b", {
+  AST("text0"),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"g", {Foo3, Foo2, Foo3}}}),
+  AST("f", {AST("d", {Foo3, Foo3, Foo1, Foo2})}),
+  AST("g", {AST{"text2"}}),
+});
+
+AST Foo("b", {
+  AST("text0"),
+  AST("f", {AST("text1")}),
+  AST("g", {AST{"g", {Foo3, Foo4, Foo3}}}),
+  AST("f", {AST("d", {Foo4, Foo4, Foo4, Foo2})}),
+  AST("g", {AST{"text2"}}),
+});
+
